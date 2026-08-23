@@ -14,7 +14,11 @@ on:
       defconfig_path:
         description: '自定义 defconfig 文件在仓库中的路径'
         required: true
-        default: 'oneplus12_defconfig'
+        default: 'waffle_defconfig'
+      clang_url:
+        description: '自定义 Clang 压缩包直链 (留空则默认使用系统 apt 安装的 Clang)'
+        required: false
+        default: 'https://github.com/llvm/llvm-project/releases/download/llvmorg-22.1.8/LLVM-22.1.8-Linux-X64.tar.xz'
 
 jobs:
   build:
@@ -30,6 +34,28 @@ jobs:
             build-essential bc bison flex libelf-dev libssl-dev dwarves \
             clang lld llvm gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu \
             zstd libzstd-dev git ccache
+
+      - name: 下载并配置自定义 Clang 工具链
+        if: ${{ github.event.inputs.clang_url != '' }}
+        run: |
+          mkdir -p $GITHUB_WORKSPACE/custom-clang
+          echo "正在下载自定义 Clang: ${{ github.event.inputs.clang_url }}"
+          curl -sSL "${{ github.event.inputs.clang_url }}" -o clang-toolchain.tar.gz
+          
+          # 自动识别并解压 tar.gz / tar.zst / tar.xz
+          tar -xf clang-toolchain.tar.gz -C $GITHUB_WORKSPACE/custom-clang
+          rm -f clang-toolchain.tar.gz
+          
+          # 将自定义 Clang bin 目录优先注入全局 PATH
+          echo "$GITHUB_WORKSPACE/custom-clang/bin" >> $GITHUB_PATH
+
+      - name: 验证当前使用的 Clang 版本
+        run: |
+          echo "=== 当前 Clang 路径与版本信息 ==="
+          which clang
+          clang --version
+          which ld.lld
+          ld.lld --version
 
       - name: 配置 ccache 缓存
         uses: actions/cache@v4
