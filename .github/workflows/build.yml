@@ -1,0 +1,87 @@
+name: Build ARM64 Mainline Kernel
+
+on:
+  workflow_dispatch:
+    inputs:
+      kernel_repo:
+        description: 'Linux 内核 Git 仓库地址'
+        required: true
+        default: 'https://github.com/DaDDevil/linux.git'
+      kernel_branch:
+        description: '内核分支或 Tag (如: master, linux-6.12.y, v6.13)'
+        required: true
+        default: 'waffle'
+      defconfig_path:
+        description: '自定义 defconfig 文件在仓库中的路径'
+        required: true
+        default: 'oneplus12_defconfig'
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: 检出当前工作流仓库
+        uses: actions/checkout@v4
+
+      - name: 配置编译环境与依赖
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential bc bison flex libelf-dev libssl-dev dwarves \
+            clang lld llvm gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu \
+            zstd libzstd-dev git ccache dtc
+
+      - name: 配置 ccache 缓存
+        uses: actions/cache@v4
+        with:
+          path: ~/.ccache
+          key: ${{ runner.os }}-kernel-ccache-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-kernel-ccache-
+
+      - name: 拉取内核源码
+        run: |
+          git clone --depth=1 --branch ${{ github.event.inputs.kernel_branch }} \
+            ${{ github.event.inputs.kernel_repo }} linux-src
+
+      - name: 载入配置文件
+        run: |
+          mkdir -p linux-src/arch/arm64/configs/
+          cp ${{ github.event.inputs.defconfig_path }} linux-src/arch/arm64/configs/custom_defconfig
+
+      - name: 编译内核、设备树与驱动模块
+        run: |
+          cd linux-src
+          export CCACHE_DIR=~/.ccache
+          export PATH="/usr/lib/ccache:$PATH"
+          export ARCH=arm64
+          export SUBARCH=arm64
+          export LLVM=1
+          export CROSS_COMPILE=aarch64-linux-gnu-
+
+          # 生成配置
+          make custom_defconfig
+
+          # 编译 Image、DTBs 与 Modules
+          make -j$(nproc) Image modules dtbs
+
+          # 安装并打包驱动模块
+          make modules_install INSTALL_MOD_PATH=../modules_out
+
+      - name: 收集与压缩输出产物
+        run: |
+          mkdir -p out/dtb
+          # 复制内核镜像
+          cp linux-src/arch/arm64/boot/Image out/
+          # 提取 SM8650 / OnePlus 12 相关的 DTB 文件
+          find linux-src/arch/arm64/boot/dts/qcom/ -name "*sm8650*" -o -name "*waffle*" -exec cp {} out/dtb/ \; 2>/dev/null || true
+          # 压缩模块文件
+          tar -czvf out/modules.tar.gz -C modules_out .
+          # 保存编译产生的完整 .config 作为回溯依据
+          cp linux-src/.config out/kernel_config.txt
+
+      - name: 上传构建产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: OnePlus12-Kernel-${{ github.event.inputs.kernel_branch }}
+          path: out/*
