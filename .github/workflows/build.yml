@@ -100,10 +100,10 @@ jobs:
           make defconfig custom_defconfig
 
           # 编译 Image、DTBs 与 Modules
-          make -j$(nproc) Image modules dtbs
+          make -j$(nproc) Image modules qcom/sm8650-oneplus-waffle.dtb
 
           # 安装并打包驱动模块
-          make modules_install INSTALL_MOD_PATH=../modules_out
+          make modules_install INSTALL_MOD_PATH=../modules_out INSTALL_MOD_STRIP=1
 
       - name: 收集与压缩输出产物
         run: |
@@ -111,7 +111,7 @@ jobs:
           # 复制内核镜像
           cp linux-src/arch/arm64/boot/Image out/
           # 提取 SM8650 / OnePlus 12 相关的 DTB 文件
-          find linux-src/arch/arm64/boot/dts/qcom/ -name "*sm8650*" -o -name "*waffle*" -exec cp {} out/dtb/ \; 2>/dev/null || true
+          find linux-src/arch/arm64/boot/dts/ -type f -name "*.dtb" -exec cp -v {} out/dtb/ \;
           # 压缩模块文件
           tar -czvf out/modules.tar.gz -C modules_out .
           # 保存编译产生的完整 .config 作为回溯依据
