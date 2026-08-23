@@ -60,7 +60,7 @@ jobs:
           export CROSS_COMPILE=aarch64-linux-gnu-
 
           # 生成配置
-          make custom_defconfig
+          make defconfig custom_defconfig
 
           # 编译 Image、DTBs 与 Modules
           make -j$(nproc) Image modules dtbs
