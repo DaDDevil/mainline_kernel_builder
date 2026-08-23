@@ -40,14 +40,25 @@ jobs:
         run: |
           mkdir -p $GITHUB_WORKSPACE/custom-clang
           echo "正在下载自定义 Clang: ${{ github.event.inputs.clang_url }}"
-          curl -sSL "${{ github.event.inputs.clang_url }}" -o clang-toolchain.tar.gz
+          curl -sSL "${{ github.event.inputs.clang_url }}" -o clang-toolchain.tar.xz
           
-          # 自动识别并解压 tar.gz / tar.zst / tar.xz
-          tar -xf clang-toolchain.tar.gz -C $GITHUB_WORKSPACE/custom-clang
-          rm -f clang-toolchain.tar.gz
+          # 解压文件
+          tar -xf clang-toolchain.tar.xz -C $GITHUB_WORKSPACE/custom-clang
+          rm -f clang-toolchain.tar.xz
           
-          # 将自定义 Clang bin 目录优先注入全局 PATH
-          echo "$GITHUB_WORKSPACE/custom-clang/bin" >> $GITHUB_PATH
+          # 自动定位 clang 所在的 bin 目录真实绝对路径（消除压缩包多层目录差异）
+          CLANG_BIN=$(find $GITHUB_WORKSPACE/custom-clang -type f -name "clang" | head -n 1)
+          if [ -z "$CLANG_BIN" ]; then
+            echo "::error::未在解压文件中找到 clang 二进制文件！"
+            exit 1
+          fi
+          
+          CLANG_BIN_DIR=$(dirname "$CLANG_BIN")
+          echo "识别到 Clang 真实路径: $CLANG_BIN_DIR"
+          
+          # 赋予执行权限并加入环境变量
+          chmod +x "$CLANG_BIN_DIR"/*
+          echo "$CLANG_BIN_DIR" >> $GITHUB_PATH
 
       - name: 验证当前使用的 Clang 版本
         run: |
