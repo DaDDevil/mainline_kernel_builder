@@ -47,7 +47,7 @@ jobs:
           rm -f clang-toolchain.tar.xz
           
           # 自动定位 clang 所在的 bin 目录真实绝对路径（消除压缩包多层目录差异）
-          CLANG_BIN=$(find $GITHUB_WORKSPACE/custom-clang -type f -name "clang" | head -n 1)
+          CLANG_BIN=$(find $GITHUB_WORKSPACE/custom-clang -type f -name "clang-*" | head -n 1)
           if [ -z "$CLANG_BIN" ]; then
             echo "::error::未在解压文件中找到 clang 二进制文件！"
             exit 1
