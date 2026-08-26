@@ -18,7 +18,7 @@ on:
       clang_url:
         description: '自定义 Clang 压缩包直链 (留空则默认使用系统 apt 安装的 Clang)'
         required: false
-        default: 'https://github.com/llvm/llvm-project/releases/download/llvmorg-22.1.8/LLVM-22.1.8-Linux-X64.tar.xz'
+        default: 'https://github.com/llvm/llvm-project/releases/download/llvmorg-23.1.0/LLVM-23.1.0-Linux-X64.tar.xz'
 
 jobs:
   build:
@@ -34,7 +34,13 @@ jobs:
             build-essential bc bison flex libelf-dev libssl-dev dwarves \
             clang lld llvm gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu \
             zstd libzstd-dev git ccache
-
+      - name: 设置开启 Swap
+        run: |
+          sudo fallocate -l 10G /swapfile
+          sudo chmod 600 /swapfile
+          sudo mkswap /swapfile
+          sudo swapon /swapfile
+          
       - name: 下载并配置自定义 Clang 工具链
         if: ${{ github.event.inputs.clang_url != '' }}
         run: |
