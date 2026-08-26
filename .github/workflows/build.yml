@@ -3,6 +3,15 @@ name: Build ARM64 Mainline Kernel
 on:
   workflow_dispatch:
     inputs:
+      enable_lto:
+        description: 'Enable ThinLTO (Clang ThinLTO)'
+        required: true
+        type: boolean
+        default: false
+      thinlto_jobs:
+        description: 'ThinLTO Parallel Jobs (Limit to 2-4 to avoid OOM)'
+        required: false
+        default: '2'
       kernel_repo:
         description: 'Linux 内核 Git 仓库地址'
         required: true
@@ -36,11 +45,13 @@ jobs:
             zstd libzstd-dev git ccache
       
       - name: 设置开启 Swap
+        if: ${{ inputs.enable_lto }}
         run: |
           sudo fallocate -l 10G /swapfile
           sudo chmod 600 /swapfile
           sudo mkswap /swapfile
           sudo swapon /swapfile
+          free -h
           
       - name: 下载并配置自定义 Clang 工具链
         if: ${{ github.event.inputs.clang_url != '' }}
@@ -93,8 +104,30 @@ jobs:
           mkdir -p linux-src/arch/arm64/configs/
           cp ${{ github.event.inputs.defconfig_path }} linux-src/arch/arm64/configs/custom_defconfig
 
+      - name: Configure Kernel & LTO Settings
+        run: |
+          # 1. 生成基础 defconfig
+          make LLVM=1 ARCH=arm64 SUBARCH=arm64 defconfig custom_defconfig
+
+          # 2. 根据 Action 输入参数开关 ThinLTO
+          if [ "${{ inputs.enable_lto }}" = "true" ]; then
+            echo "===> Enabling Clang ThinLTO..."
+            ./scripts/config -e LTO_CLANG_THIN -d LTO_NONE -d LTO_CLANG_FULL
+          else
+            echo "===> Disabling LTO (Building with LTO_NONE)..."
+            ./scripts/config -e LTO_NONE -d LTO_CLANG_THIN -d LTO_CLANG_FULL
+          fi
+
+          # 3. 刷新 Kconfig 依赖关系
+          make ARCH=arm64 SUBARCH=arm64 LLVM=1 LLVM_IAS=1 olddefconfig
+
       - name: 编译内核、设备树与驱动模块
         run: |
+          EXTRA_LDFLAGS=""
+          if [ "${{ inputs.enable_lto }}" = "true" ]; then
+            EXTRA_LDFLAGS="KBUILD_LDFLAGS=-Wl,--thinlto-jobs=${{ inputs.thinlto_jobs }}"
+          fi
+          
           cd linux-src
           export CCACHE_DIR=~/.ccache
           export PATH="/usr/lib/ccache:$PATH"
@@ -103,11 +136,8 @@ jobs:
           export LLVM=1
           export CROSS_COMPILE=aarch64-linux-gnu-
 
-          # 生成配置
-          make defconfig custom_defconfig
-
           # 编译 Image、DTBs 与 Modules
-          make -j$(nproc) Image modules qcom/sm8650-oneplus-waffle.dtb
+          make -j$(nproc) $EXTRA_LDFLAGS Image modules qcom/sm8650-oneplus-waffle.dtb
 
           # 安装并打包驱动模块
           make modules_install INSTALL_MOD_PATH=../modules_out INSTALL_MOD_STRIP=1
