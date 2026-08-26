@@ -34,6 +34,7 @@ jobs:
             build-essential bc bison flex libelf-dev libssl-dev dwarves \
             clang lld llvm gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu \
             zstd libzstd-dev git ccache
+      
       - name: 设置开启 Swap
         run: |
           sudo fallocate -l 10G /swapfile
