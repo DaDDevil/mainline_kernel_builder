@@ -130,7 +130,7 @@ jobs:
         run: |
           EXTRA_LDFLAGS=""
           if [ "${{ inputs.enable_lto }}" = "true" ]; then
-            EXTRA_LDFLAGS="KBUILD_LDFLAGS=-Wl,--thinlto-jobs=${{ inputs.thinlto_jobs }}"
+            EXTRA_LDFLAGS="KBUILD_LDFLAGS=--thinlto-jobs=${{ inputs.thinlto_jobs }}"
           fi
           
           cd linux-src
