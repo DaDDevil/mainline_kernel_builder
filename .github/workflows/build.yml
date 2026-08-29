@@ -110,6 +110,7 @@ jobs:
 
       - name: Configure Kernel & LTO Settings
         run: |
+          cd linux-src/
           # 1. 生成基础 defconfig
           make LLVM=1 ARCH=arm64 SUBARCH=arm64 defconfig custom_defconfig
 
