@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       enable_lto:
-        description: 'Enable ThinLTO (Clang ThinLTO)'
+        description: '启用 ThinLTO (Clang ThinLTO)'
         required: true
         type: boolean
         default: false
@@ -44,9 +44,13 @@ jobs:
             clang lld llvm gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu \
             zstd libzstd-dev git ccache
       
-      - name: 设置开启 Swap
-        if: ${{ inputs.enable_lto }}
+      - name: 启用 10GB Swap
         run: |
+          # 1. 停用并删除系统已存在的默认 swapfile
+          sudo swapoff -a || true
+          sudo rm -f /swapfile
+
+          # 2. 重新创建 10GB Swap
           sudo fallocate -l 10G /swapfile
           sudo chmod 600 /swapfile
           sudo mkswap /swapfile
